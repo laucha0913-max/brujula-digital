@@ -1,0 +1,107 @@
+/* =========================================================
+   BRÚJULA DIGITAL — comportamiento
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   ⚙️  CONFIGURACIÓN — CAMBIÁ SOLO ESTAS DOS LÍNEAS
+   Número de WhatsApp en formato internacional, SOLO dígitos,
+   sin "+", sin espacios ni guiones.
+   Ejemplo Uruguay (celular 099 123 456):  "59899123456"
+--------------------------------------------------------- */
+const WHATSAPP_NUMBER = "TU_NUMERO_AQUI";
+const WHATSAPP_GREETING = "¡Hola! Vi la página de Brújula Digital y quiero más información.";
+
+/* ---------------------------------------------------------
+   Helpers
+--------------------------------------------------------- */
+const numberIsSet = () => /^\d{8,15}$/.test(WHATSAPP_NUMBER);
+
+function buildWhatsAppUrl(text) {
+  return "https://wa.me/" + WHATSAPP_NUMBER + "?text=" + encodeURIComponent(text);
+}
+
+function showToast(message) {
+  const el = document.getElementById("appToast");
+  el.querySelector(".toast-body").textContent = message;
+  bootstrap.Toast.getOrCreateInstance(el, { delay: 6000 }).show();
+}
+
+/* Abre WhatsApp (o avisa si todavía no se configuró el número) */
+function openWhatsApp(text) {
+  if (!numberIsSet()) {
+    showToast("Falta configurar el número: abrí main.js y cambiá WHATSAPP_NUMBER por tu número (solo dígitos, con código de país).");
+    return;
+  }
+  window.open(buildWhatsAppUrl(text), "_blank", "noopener");
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  /* Botón flotante y botones "Escribir por WhatsApp" */
+  document.querySelectorAll("[data-wa]").forEach((el) => {
+    el.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      const custom = el.getAttribute("data-wa-text");
+      openWhatsApp(custom || WHATSAPP_GREETING);
+    });
+    // Si el número está bien, el enlace también funciona con clic derecho / "abrir en pestaña nueva"
+    if (numberIsSet()) el.setAttribute("href", buildWhatsAppUrl(el.getAttribute("data-wa-text") || WHATSAPP_GREETING));
+  });
+
+  /* Tooltips de Bootstrap */
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => new bootstrap.Tooltip(el));
+
+  /* Contadores animados */
+  const counters = document.querySelectorAll("[data-count]");
+  const countObs = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      const el = e.target, target = +el.dataset.count, dur = 1400, t0 = performance.now();
+      const tick = (t) => {
+        const p = Math.min((t - t0) / dur, 1);
+        el.textContent = Math.floor(target * (1 - Math.pow(1 - p, 3)));
+        if (p < 1) requestAnimationFrame(tick);
+        else el.textContent = target;
+      };
+      requestAnimationFrame(tick);
+      countObs.unobserve(el);
+    });
+  }, { threshold: 0.4 });
+  counters.forEach((c) => countObs.observe(c));
+
+  /* Volver arriba */
+  const toTop = document.getElementById("toTop");
+  window.addEventListener("scroll", () => toTop.classList.toggle("show", window.scrollY > 500));
+  toTop.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+
+  /* Cerrar el menú móvil al elegir una opción */
+  const offcanvasEl = document.getElementById("menuOffcanvas");
+  offcanvasEl.querySelectorAll("a.nav-link").forEach((a) =>
+    a.addEventListener("click", () => bootstrap.Offcanvas.getInstance(offcanvasEl)?.hide())
+  );
+
+  /* Botones "Elegir plan": rellenan el mensaje del formulario */
+  document.querySelectorAll("[data-plan]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.getElementById("mensaje").value = "Hola, me interesa el plan " + btn.dataset.plan + ".";
+    });
+  });
+
+  /* Formulario: valida y manda el mensaje por WhatsApp */
+  const form = document.getElementById("contactForm");
+  form.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    if (!form.checkValidity()) {
+      form.classList.add("was-validated");
+      return;
+    }
+    const nombre = form.nombre.value.trim();
+    const rubro = form.rubro.value;
+    const mensaje = form.mensaje.value.trim();
+    const texto =
+      "Hola, soy " + nombre + ".\n" +
+      "Rubro: " + rubro + "\n" +
+      "Mensaje: " + mensaje;
+    openWhatsApp(texto);
+    form.classList.remove("was-validated");
+  });
+});
